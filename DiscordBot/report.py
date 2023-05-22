@@ -6,6 +6,12 @@ class State(Enum):
     REPORT_START = auto()
     AWAITING_MESSAGE = auto()
     MESSAGE_IDENTIFIED = auto()
+    SPAM_REPORT_START = auto()
+    HARASSMENT_REPORT_START = auto()
+    OFFENSIVE_CONTENT_REPORT_START = auto()
+    THREATS_REPORT_START = auto()
+    OTHER_REPORT_START = auto()
+    SELECT_REPORT_TARGRT = auto()
     REPORT_COMPLETE = auto()
 
 class Report:
@@ -55,11 +61,87 @@ class Report:
 
             # Here we've found the message - it's up to you to decide what to do next!
             self.state = State.MESSAGE_IDENTIFIED
-            return ["I found this message:", "```" + message.author.name + ": " + message.content + "```", \
-                    "This is all I know how to do right now - it's up to you to build out the rest of my reporting flow!"]
+            reply = ["I found this message:", "```" + message.author.name + ": " + message.content + "```"]
+            select_report_type_reply = "Please select the reason for report from the following options:\n"
+            select_report_type_reply += "`1`: Spam\n"
+            select_report_type_reply += "`2`: Harassment\n"
+            select_report_type_reply += "`3`: Offensive Content\n"
+            select_report_type_reply += "`4`: Threats\n"
+            select_report_type_reply += "`5`: Other\n"
+            reply.append(select_report_type_reply)
+            return reply
         
         if self.state == State.MESSAGE_IDENTIFIED:
-            return ["<insert rest of reporting flow here>"]
+            if message.content == "1":
+                self.state = State.SPAM_REPORT_START
+                reply = "Thank you for reporting! Please select the type of span by entering one of the following options: `1a`, `1b`, `1c`, `1d`:\n"
+                reply += "`1a`: Scam\n"
+                reply += "`1b`: Soliciation\n"
+                reply += "`1c`: Repeated Unwanted Messages\n"
+                reply += "`1d`: Bot\n"
+                return [reply]
+            elif message.content == "2":
+                self.state = State.HARASSMENT_REPORT_START
+                reply = "Thank you for reporting! Please select the type of harassment by entering one of the following options: `2a`, `2b`, `2c`, `2d`:\n"
+                reply += "`2a`: Appearance Attack\n"
+                reply += "`2b`: Sexual Harassment\n"
+                reply += "`2c`: Targeted Attack\n"
+                reply += "`2d`: Revealing Personal Info\n"
+                return [reply]
+            elif message.content == "3":
+                self.state = State.OFFENSIVE_CONTENT_REPORT_START
+                reply = "Thank you for reporting! Please select the type of offensive content by entering one of the following options: `3a`, `3b`:\n"
+                reply += "`3a`: Hate Speech\n"
+                reply += "`3b`: Sexual Content\n"
+                return [reply]
+            elif message.content == "4":
+                self.state = State.THREATS_REPORT_START
+                reply = "Thank you for reporting! Please select the type of threat by entering one of the following options: `4a`, `4b`, `4c`, `4d`:\n"
+                reply += "`4a`: Threat to Swat\n"
+                reply += "`4b`: Threat to Cyber Attack\n"
+                reply += "`4c`: Self-harm\n"
+                reply += "`4d`: Violent Messaging\n"
+            elif message.content == "5":
+                self.state = State.OTHER_REPORT_START
+                reply = "Thank you for reporting! Please enter details.\n"
+                return [reply]
+            else:
+                return ["Please choose from the list. Try again or say `cancel` to cancel."]
+        
+        # TODO: save user selection
+        if self.state == State.SPAM_REPORT_START:
+            if message.content not in ["1a", "1b", "1c", "1d"]:
+                return ["Please choose from the list. Try again or say `cancel` to cancel."]
+            self.state = State.SELECT_REPORT_TARGRT
+            reply = "Do these messages bother you or the streamer?\n Select from `me` or `streamer`"
+            return [reply]
+        
+        if self.state == State.HARASSMENT_REPORT_START:
+            if message.content not in ["2a", "2b", "2c", "2d"]:
+                return ["Please choose from the list. Try again or say `cancel` to cancel."]
+            self.state = State.SELECT_REPORT_TARGRT
+            reply = "Do these messages bother you or the streamer?\n Select from `me` or `streamer`"
+            return [reply]
+        
+        if self.state == State.OFFENSIVE_CONTENT_REPORT_START:
+            if message.content not in ["3a", "3b"]:
+                return ["Please choose from the list. Try again or say `cancel` to cancel."]
+            
+        if self.state == State.THREATS_REPORT_START:
+            if message.content not in ["4a", "4b", "4c", "4d"]:
+                return ["Please choose from the list. Try again or say `cancel` to cancel."]
+            self.state = State.REPORT_COMPLETE
+            return ["Your report will be reviewed and potentially reported to local authorities."]
+        
+        if self.state == State.OTHER_REPORT_START:
+            self.state = State.SELECT_REPORT_TARGRT
+            reply = "Do these messages bother you or the streamer?\n Select from `me` or `streamer`"
+            return [reply]
+
+        if self.state == State.SELECT_REPORT_TARGRT:
+            if message.content not in ["me", "streamer"]:
+                return ["Please choose from the list. Try again or say `cancel` to cancel."]
+            return ["TODO"]
 
         return []
 
