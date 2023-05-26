@@ -1,12 +1,19 @@
 # bot.py
 import discord
 from discord.ext import commands
+from discord import ui
 import os
 import json
 import logging
 import re
 import requests
 from report import Report
+from report import Select
+from report import Data
+from report import Mod_Report
+from report import Report_Details
+import copy
+
 import pdb
 
 # Set up logging to the console
@@ -25,17 +32,23 @@ with open(token_path) as f:
     tokens = json.load(f)
     discord_token = tokens['discord']
 
+# Our universal data storage
+data = Data()
 
 class ModBot(discord.Client):
     def __init__(self): 
         intents = discord.Intents.default()
-        # intents.message_content = True
+        intents.message_content = True
         intents.messages = True
         super().__init__(command_prefix='.', intents=intents)
         self.group_num = None
+        self.actual_channel = None
         self.mod_channels = {} # Map from guild to the mod channel id for that guild
         self.reports = {} # Map from user IDs to the state of their report
-
+        self.moderators = {} # Map from moderator IDs to the state of their moderation
+        self.flagged_messages = {}
+        self.prohibited_messages = []
+    
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
         for guild in self.guilds:
@@ -72,7 +85,7 @@ class ModBot(discord.Client):
             await self.handle_dm(message)
 
     async def handle_dm(self, message):
-        # Handle a help message
+        # Handle a help message dm
         if message.content == Report.HELP_KEYWORD:
             reply =  "Use the `report` command to begin the reporting process.\n"
             reply += "Use the `cancel` command to cancel the report process.\n"
@@ -90,42 +103,135 @@ class ModBot(discord.Client):
         if author_id not in self.reports:
             self.reports[author_id] = Report(self)
 
-        # Let the report class handle this message; forward all the messages it returns to uss
-        responses = await self.reports[author_id].handle_message(message)
-        for r in responses:
-            await message.channel.send(r)
-
-        # If the report is complete or cancelled, remove it from our map
-        if self.reports[author_id].report_complete():
+        # Let the report class handle the message; forward all the messages it returns to us
+        """ 
+        NOTES FROM EDDIE: We have to get funky with a while loop, because when a user selects something in a menu,
+        They don't send a message back, and so our next handle_dm wouldn't actually trigger.
+        Instead, we keep a loop going and wait for the user to complete an interaction with our select menu, and then loop
+        back to getting our bot's next response to their chosen selection (which could be another selection menu, or a text-prompt)
+        """ 
+        send_message = message
+        selections = []
+        keep_loop = True
+        while keep_loop:
+            responses = await self.reports[author_id].handle_message(send_message)
+            keep_loop = False
+            for r in responses:
+                # if this response is a list not a string (NOTE! ASSUMED TO BE A DROPDOWN OPTION LIST): 
+                if isinstance(r, list):
+                    # Then create our selection menu, send it to the user, and wait 
+                    select = Select(r, self.reports[author_id], k=1)
+                    select_view = ui.View(timeout=None)
+                    select_view.add_item(select)
+                    await message.channel.send(view=select_view)
+                    # POTENTIAL FLAG! Later on, with concurrency / many users at once, we may need to add a menu_id to our wait_for so we don't
+                    # wake up early for another slection 
+                    await self.wait_for("interaction")
+                    selections = select.selections
+                    keep_loop = True
+                # If this response is just a string, then send as normal
+                else:
+                    await message.channel.send(r)
+            send_message = selections
+        
+        # If our report is now completed or cancelled, remove from our ongoing reports
+        completed_report = self.reports[author_id].report_complete()
+        if completed_report:
             self.reports.pop(author_id)
-
-    async def handle_channel_message(self, message):
-        # Only handle messages sent in the "group-#" channel
-        if not message.channel.name == f'group-{self.group_num}':
-            return
-
-        # Forward the message to the mod channel
-        mod_channel = self.mod_channels[message.guild.id]
-        await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
-        scores = self.eval_text(message.content)
-        await mod_channel.send(self.code_format(scores))
-
+            # if we had a completed report (not a cancelled one: which would just be True), add it to our data
+            if isinstance(completed_report, Report_Details):
+                data.add_report(completed_report)
+                # if it was flagged as an organized attack, start actively monitoring for this message content (add to our flagged_ list)
+                if completed_report.organized_attack:
+                    completed_report.auto_flagged = 1
+                    self.flagged_messages[completed_report.message_content] = completed_report
+                
     
+    async def handle_channel_message(self, message):
+        # Handle moderating messages sent in the "group-#-mod" channel
+        if message.channel.name == f'group-{self.group_num}-mod':
+            author_id = message.author.id
+            responses = []
+            # Only respond to messages if they're part of a moderating flow
+            if author_id not in self.moderators and not message.content.startswith(Mod_Report.MOD_START_KEYWORD):
+                return
+        
+            # If we don't currently have an active moderating flow for this user, add one
+            if author_id not in self.moderators:
+                self.moderators[author_id] = Mod_Report(self, data)
+
+            # Let the mod_report class handle the message; forward all the messages it returns to us
+            send_message = message
+            selections = []
+            keep_loop = True
+            # NOTE: SEE DM FUNCTION ABOUT THE WHILE LOOP REASONING
+            while keep_loop:
+                responses = await self.moderators[author_id].handle_message(send_message)
+                keep_loop = False
+                for r in responses:
+                    if isinstance(r, list):
+                        # Note: a fixed k is currently a weird earlier artifact from Eddie (sorry) to ensure multiple-selection dropdowns. It's not actually what we want in our yes-no options. 
+                        # We may want to make it so that each response here has a parameter itself for how many options should be selected (i.e. a bool: single-choice or any)
+                        select = Select(r, self.moderators[author_id], k=25)
+                        select_view = ui.View(timeout=None)
+                        select_view.add_item(select)
+                        await message.channel.send(view=select_view)
+                        # again, may need to specify.
+                        await self.wait_for("interaction")
+                        selections = select.selections
+                        keep_loop = True
+                    else:
+                        await message.channel.send(r)
+                send_message = selections
+            
+            # If completed or cancelled, remove from our ongoing moderations
+            completed_moderator = self.moderators[author_id].moderator_complete()
+            if completed_moderator:
+                self.moderators.pop(author_id)
+                
+        
+        # For messages in group-#, examine for flagged or prohibited messages 
+        elif message.channel.name == f'group-{self.group_num}':
+             # For messages in group-#, examine for flagged or prohibited messages 
+            mod_channel = self.mod_channels[message.guild.id]
+            flagged_or_prohibited = self.eval_text(message)
+            if flagged_or_prohibited: 
+                await mod_channel.send(self.code_format(message.content, flagged_or_prohibited))
+
+        return 
+        
+
+        
     def eval_text(self, message):
         ''''
         TODO: Once you know how you want to evaluate messages in your channel, 
         insert your code here! This will primarily be used in Milestone 3. 
         '''
-        return message
+        print(list(self.flagged_messages.keys()))
+        # delete if prohibited: this will be useful with an auto-filter
+        if message.content in self.prohibited_messages:
+            message.delete()
+            return "Deleted"
+        
+        # flag if the content matches previously user-flagged content 
+        elif message.content in list(self.flagged_messages.keys()):
+            new_report = copy.copy(self.flagged_messages[message.content])
+            new_report.author = message.author.name
+            new_report.message_id = message.id
+            new_report.message_content = message.content
+            data.add_report(new_report)
+            return "Auto-Flagged"
 
+        else:
+            return False
     
-    def code_format(self, text):
+    def code_format(self, text, flagged_or_prohibited):
         ''''
         TODO: Once you know how you want to show that a message has been 
         evaluated, insert your code here for formatting the string to be 
         shown in the mod channel. 
         '''
-        return "Evaluated: '" + text+ "'"
+        return "Bot " + flagged_or_prohibited + " the message: `" + text + "`"
 
 
 client = ModBot()
