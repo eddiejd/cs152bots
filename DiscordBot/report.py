@@ -6,6 +6,39 @@ from discord.ext import commands
 import pandas as pd
 import copy
 
+SPAM_CHOICE = "Spam"
+HARASSMENT_CHOICE = "Harassment"
+OFFENSIVE_CHOICE = "Offensive Content"
+THREAT_CHOICE = "Threats"
+OTHER_CHOICE = "Other"
+
+SCAM_CHOICE = "Scam"
+SOLICITATION_CHOICE = "Solicitation"
+UNWANTED_MSG_CHOICE = "Repeated Unwanted Messages"
+BOT_CHOICE = "Bot"
+
+APPEARANCE_CHOICE = "Appearance Attack"
+SEXUAL_HARASSMENT_CHOICE = "Sexual Harassment"
+TARGET_ATTACK_CHOICE = "Targeted Attack"
+PERSONAL_INFO_CHOICE = "Revealing Personal Info"
+
+HATE_SPEECH_CHOICE = "Hate Speech"
+SEXUAL_CONTENT_CHOICE = "Sexual Content"
+
+SWAT_CHOICE = "Threat to SWAT"
+CYBER_ATTACK_CHOICE = "Threat to Cyber Attack"
+SELF_HARM_CHOICE = "Self-Harm"
+VIOLENT_MESSAGING_CHOICE = "Violent Messaging"
+
+
+REPORTING_TEXT_OPTIONS = [SPAM_CHOICE, HARASSMENT_CHOICE, OFFENSIVE_CHOICE, THREAT_CHOICE, OTHER_CHOICE]
+SPAM_TEXT_OPTIONS = [SCAM_CHOICE, SOLICITATION_CHOICE, UNWANTED_MSG_CHOICE, BOT_CHOICE, OTHER_CHOICE] 
+HARASSMENT_TEXT_OPTIONS = [APPEARANCE_CHOICE, SEXUAL_HARASSMENT_CHOICE, TARGET_ATTACK_CHOICE, PERSONAL_INFO_CHOICE, OTHER_CHOICE]
+OFFENSIVE_CONTENT_TEXT_OPTIONS = [HATE_SPEECH_CHOICE, SEXUAL_CONTENT_CHOICE, OTHER_CHOICE]
+THREAT_TEXT_OPTIONS = [SWAT_CHOICE, CYBER_ATTACK_CHOICE, SELF_HARM_CHOICE, VIOLENT_MESSAGING_CHOICE, OTHER_CHOICE]
+
+
+
 class State(Enum):
     # User States
     REPORT_START = auto()
@@ -142,6 +175,7 @@ class Mod_Report:
             report_options = []
             for index, report in top_25_df.iterrows():
                 content = report['Content']
+                print(f"Author: {report['Author']}, Report Reason: {report['Report_Reason']}, Report SubCategory: {report['Report_SubCategory']}")
                 report_options.append(discord.SelectOption(label=f"Content: {content}",
                                                            description=f"Author: {report['Author']}, Report Reason: {report['Report_Reason']}, Report SubCategory: {report['Report_SubCategory']}",
                                                            value=report['ID']))
@@ -324,11 +358,14 @@ START_KEYWORD = "report"
 MOD_KEYWORD = "start"
 CANCEL_KEYWORD = "cancel"
 HELP_KEYWORD = "help"
-REPORTING_OPTIONS = [discord.SelectOption(label="Spam"), discord.SelectOption(label='Harassment'), discord.SelectOption(label='Offensive Content'), discord.SelectOption(label='Threats'), discord.SelectOption(label='Other')]
-SPAM_OPTIONS = [discord.SelectOption(label="Scam"), discord.SelectOption(label='Soliciation'), discord.SelectOption(label='Repeated Unwanted Messages'), discord.SelectOption(label='Bot'), discord.SelectOption(label='Other')]
-HARASSMENT_OPTIONS = [discord.SelectOption(label="Appearance Attack"), discord.SelectOption(label='Sexual Harassment'), discord.SelectOption(label='Targeted Attack'), discord.SelectOption(label='Revealing Personal Info'), discord.SelectOption(label='Other')]
-OFFENSIVE_CONTENT_OPTIONS = [discord.SelectOption(label="Hate Speech"), discord.SelectOption(label='Sexual Content'), discord.SelectOption(label='Other')]
-THREATS_OPTIONS = [discord.SelectOption(label="Threat to Swat"), discord.SelectOption(label='Threat to Cyber Attack'), discord.SelectOption(label='Self-harm'), discord.SelectOption(label='Violent Messaging'), discord.SelectOption(label='Other')]
+
+
+REPORTING_OPTIONS = [discord.SelectOption(label=x) for x in REPORTING_TEXT_OPTIONS]
+SPAM_OPTIONS = [discord.SelectOption(label=x) for x in SPAM_TEXT_OPTIONS]
+HARASSMENT_OPTIONS = [discord.SelectOption(label=x) for x in HARASSMENT_TEXT_OPTIONS]
+OFFENSIVE_CONTENT_OPTIONS = [discord.SelectOption(label=x) for x in OFFENSIVE_CONTENT_TEXT_OPTIONS]
+THREATS_OPTIONS = [discord.SelectOption(label=x) for x in THREAT_TEXT_OPTIONS]
+
 TARGET_OPTIONS = [discord.SelectOption(label="Me"), discord.SelectOption(label='Streamer')]
 FILTER_OPTIONS = [discord.SelectOption(label="Yes"), discord.SelectOption(label='No')]
 ORGANIZED_ATTACK_OPTIONS = [discord.SelectOption(label="Yes"), discord.SelectOption(label='Unsure'), discord.SelectOption(label='No')]
@@ -339,11 +376,11 @@ class Report:
     START_KEYWORD = "report"
     CANCEL_KEYWORD = "cancel"
     HELP_KEYWORD = "help"
-    REPORTING_OPTIONS = [discord.SelectOption(label="Spam"), discord.SelectOption(label='Harassment'), discord.SelectOption(label='Offensive Content'), discord.SelectOption(label='Threats'), discord.SelectOption(label='Other')]
-    SPAM_OPTIONS = [discord.SelectOption(label="Scam"), discord.SelectOption(label='Soliciation'), discord.SelectOption(label='Repeated Unwanted Messages'), discord.SelectOption(label='Bot'), discord.SelectOption(label='Other')]
-    HARASSMENT_OPTIONS = [discord.SelectOption(label="Appearance Attack"), discord.SelectOption(label='Sexual Harassment'), discord.SelectOption(label='Targeted Attack'), discord.SelectOption(label='Revealing Personal Info'), discord.SelectOption(label='Other')]
-    OFFENSIVE_CONTENT_OPTIONS = [discord.SelectOption(label="Hate Speech"), discord.SelectOption(label='Sexual Content'), discord.SelectOption(label='Other')]
-    THREATS_OPTIONS = [discord.SelectOption(label="Threat to Swat"), discord.SelectOption(label='Threat to Cyber Attack'), discord.SelectOption(label='Self-harm'), discord.SelectOption(label='Violent Messaging'), discord.SelectOption(label='Other')]
+    REPORTING_OPTIONS = [discord.SelectOption(label=x) for x in REPORTING_TEXT_OPTIONS]
+    SPAM_OPTIONS = [discord.SelectOption(label=x) for x in SPAM_TEXT_OPTIONS]
+    HARASSMENT_OPTIONS = [discord.SelectOption(label=x) for x in HARASSMENT_TEXT_OPTIONS]
+    OFFENSIVE_CONTENT_OPTIONS = [discord.SelectOption(label=x) for x in OFFENSIVE_CONTENT_TEXT_OPTIONS]
+    THREATS_OPTIONS = [discord.SelectOption(label=x) for x in THREAT_TEXT_OPTIONS]
     TARGET_OPTIONS = [discord.SelectOption(label="Me"), discord.SelectOption(label='Streamer')]
     FILTER_OPTIONS = [discord.SelectOption(label="Yes"), discord.SelectOption(label='No')]
     ORGANIZED_ATTACK_OPTIONS = [discord.SelectOption(label="Yes"), discord.SelectOption(label='Unsure'), discord.SelectOption(label='No')]
@@ -407,19 +444,19 @@ class Report:
         if self.state == State.MESSAGE_IDENTIFIED:
             choice = message[0]
             reply = ["Thank you for reporting! Please select the type of " + choice + " from the following options:"]
-            if choice == "Spam":
+            if choice == SPAM_CHOICE:
                 self.state = State.SPAM_REPORT_START
                 reply.append(SPAM_OPTIONS)
-            elif choice == "Harassment":
+            elif choice == HARASSMENT_CHOICE:
                 self.state = State.HARASSMENT_REPORT_START
                 reply.append(HARASSMENT_OPTIONS)
-            elif choice == "Offensive Content":
+            elif choice == OFFENSIVE_CHOICE:
                 self.state = State.OFFENSIVE_CONTENT_REPORT_START
                 reply.append(OFFENSIVE_CONTENT_OPTIONS)
-            elif choice == "Threats":
+            elif choice == THREAT_CHOICE:
                 self.state = State.THREATS_REPORT_START
                 reply.append(THREATS_OPTIONS)
-            elif choice == "Other":
+            elif choice == OTHER_CHOICE:
                 self.state = State.OTHER_REPORT_START
                 reply = ["Thank you for reporting! Please enter more details.\n"]
             else:

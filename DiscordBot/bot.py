@@ -12,7 +12,12 @@ from report import Select
 from report import Data
 from report import Mod_Report
 from report import Report_Details
+import openai_api_toxicity
+import perspective_api_toxicity
+from perspective_api_toxicity import perspective_analyze_message
+from openai_api_toxicity import get_gpt4_response
 import copy
+from googleapiclient import discovery
 
 import pdb
 
@@ -31,6 +36,19 @@ with open(token_path) as f:
     # If you get an error here, it means your token is formatted incorrectly. Did you put it in quotes?
     tokens = json.load(f)
     discord_token = tokens['discord']
+    perspective_token = tokens['perspective']
+    openai_org_token = tokens['openai_organization']
+    openai_token = tokens['openai_sk']
+
+perspective_api_client = discovery.build(
+  "commentanalyzer",
+  "v1alpha1",
+  developerKey=perspective_token,
+  discoveryServiceUrl="https://commentanalyzer.googleapis.com/$discovery/rest?version=v1alpha1",
+  static_discovery=False,
+)
+
+perspective_api_sensitivity = perspective_api_toxicity.SENSITIVITY_MODES["Moderate"]
 
 # Our universal data storage
 data = Data()
@@ -85,6 +103,7 @@ class ModBot(discord.Client):
             await self.handle_dm(message)
 
     async def handle_dm(self, message):
+        openai_api_toxicity.get_gpt4_response(message, openai_org_token, openai_token)
         # Handle a help message dm
         if message.content == Report.HELP_KEYWORD:
             reply =  "Use the `report` command to begin the reporting process.\n"
@@ -152,10 +171,13 @@ class ModBot(discord.Client):
         if message.channel.name == f'group-{self.group_num}-mod':
             author_id = message.author.id
             responses = []
-            # Only respond to messages if they're part of a moderating flow
-            if author_id not in self.moderators and not message.content.startswith(Mod_Report.MOD_START_KEYWORD):
+            if author_id not in self.moderators:
                 return
-        
+    
+            # Only respond to messages if they're part of a moderating flow
+            if not message.content.startswith(Mod_Report.MOD_START_KEYWORD):
+                return
+
             # If we don't currently have an active moderating flow for this user, add one
             if author_id not in self.moderators:
                 self.moderators[author_id] = Mod_Report(self, data)
@@ -197,11 +219,11 @@ class ModBot(discord.Client):
             flagged_or_prohibited = self.eval_text(message)
             if flagged_or_prohibited: 
                 await mod_channel.send(self.code_format(message.content, flagged_or_prohibited))
-
+                if "deleted" in flagged_or_prohibited:
+                    await message.delete()
         return 
         
 
-        
     def eval_text(self, message):
         ''''
         TODO: Once you know how you want to evaluate messages in your channel, 
@@ -210,8 +232,7 @@ class ModBot(discord.Client):
         print(list(self.flagged_messages.keys()))
         # delete if prohibited: this will be useful with an auto-filter
         if message.content in self.prohibited_messages:
-            message.delete()
-            return "Deleted"
+            return "deleted [prohibited message]"
         
         # flag if the content matches previously user-flagged content 
         elif message.content in list(self.flagged_messages.keys()):
@@ -220,10 +241,20 @@ class ModBot(discord.Client):
             new_report.message_id = message.id
             new_report.message_content = message.content
             data.add_report(new_report)
-            return "Auto-Flagged"
-
+            return "auto-flagged"
         else:
-            return False
+            new_report, gpt_score = get_gpt4_response(message, openai_org_token, openai_token, sensitivity=perspective_api_sensitivity)
+            new_report, score = perspective_analyze_message(perspective_api_client, message, sensitivity=perspective_api_sensitivity)
+            print("Perspective score: ", score, "GPT score: ", gpt_score)
+            if new_report is not None:
+                if score > perspective_api_toxicity.PERSPECTIVE_AUTODELETE_THRESHOLD:
+                    return "deleted [exceeds toxicity threshold]"
+                else:
+                    data.add_report(new_report)
+                    return "auto-flagged"
+            else:
+                return False
+    
     
     def code_format(self, text, flagged_or_prohibited):
         ''''
