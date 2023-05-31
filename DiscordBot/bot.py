@@ -248,9 +248,10 @@ class ModBot(discord.Client):
             data.add_report(new_report)
             return "auto-flagged"
         else:
-            new_report, gpt_score = get_gpt4_response(message, openai_org_token, openai_token, sensitivity=perspective_api_sensitivity)
+            # GPT4 is super slow, so I think perspective api is better for livestreaming applicaiton
+            #new_report, gpt_score = get_gpt4_response(message, openai_org_token, openai_token, sensitivity=perspective_api_sensitivity)
             new_report, score = perspective_analyze_message(perspective_api_client, message, sensitivity=perspective_api_sensitivity)
-            print("Perspective score: ", score, "GPT score: ", gpt_score)
+            #print("Perspective score: ", score, "GPT score: ", gpt_score)
             if new_report is not None:
                 if score > perspective_api_toxicity.PERSPECTIVE_AUTODELETE_THRESHOLD:
                     return "deleted [exceeds toxicity threshold]"
