@@ -28,7 +28,7 @@ def get_gpt4_response(message, openai_org_token, openai_token, sensitivity=0.7):
     response = openai.ChatCompletion.create(
     model="gpt-4",
     messages=[
-    {"role": "system", "content": "You are a content moderation system. Classify each input as either Spam, Harassment, Offensive Content, Threatening, or Not Harmful. Also provide a confidence score that the message belongs to the particular category."},
+    {"role": "system", "content": "You are a content moderation system for a livestreaming chat. Classify each input as either Spam, Harassment, Offensive Content, Threatening, or Not Harmful. Also provide a confidence score that the message belongs to the particular category."},
     {"role": "user", "content": "I am going to kill you."},
     {"role": "assistant", "content": "Threatening, 1.0"},
     {"role": "user", "content": "I love you"},
@@ -37,7 +37,9 @@ def get_gpt4_response(message, openai_org_token, openai_token, sensitivity=0.7):
     {"role": "assistant", "content": "Spam, 0.94"},
     {"role": "user", "content": "I think anyone who is not white is inferior."},
     {"role": "assistant", "content": "Offensive Content, 0.99"},
-    {"role": "user", "content": "You are stupid, look terrible and your address is 450 Serra Mall, Stanford, CA."},
+    {"role": "user", "content": "You are stupid and also look terrible. and your address is 450 Serra Mall, Stanford, CA."},
+    {"role": "assistant", "content": "Harassment, 0.99"},
+    {"role": "user", "content": "You live at 450 Serra Mall, Stanford, CA."},
     {"role": "assistant", "content": "Harassment, 0.98"},
     next_prompt
     ]
