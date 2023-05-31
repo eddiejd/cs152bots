@@ -103,7 +103,6 @@ class ModBot(discord.Client):
             await self.handle_dm(message)
 
     async def handle_dm(self, message):
-        openai_api_toxicity.get_gpt4_response(message, openai_org_token, openai_token)
         # Handle a help message dm
         if message.content == Report.HELP_KEYWORD:
             reply =  "Use the `report` command to begin the reporting process.\n"
@@ -171,11 +170,9 @@ class ModBot(discord.Client):
         if message.channel.name == f'group-{self.group_num}-mod':
             author_id = message.author.id
             responses = []
-            if author_id not in self.moderators:
-                return
     
             # Only respond to messages if they're part of a moderating flow
-            if not message.content.startswith(Mod_Report.MOD_START_KEYWORD):
+            if author_id not in self.moderators and not message.content.startswith(Mod_Report.MOD_START_KEYWORD):
                 return
 
             # If we don't currently have an active moderating flow for this user, add one

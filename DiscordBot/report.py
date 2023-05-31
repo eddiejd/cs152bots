@@ -186,6 +186,7 @@ class Mod_Report:
 
             self.state = State.REPORT_SELECTION
             reply.append(report_options)
+            reply.append(f"\n[Message Details]\n**Content:** `{content}`\n**Report Reason:** `{report['Report_Reason']}`\n**Report Subcategory:** `{report['Report_SubCategory']}`\n**Autoflagged?** `{bool(report['Auto_Flagged'])}`")
             return reply
 
         # Select whether the messages were a violation
