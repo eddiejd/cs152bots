@@ -76,3 +76,10 @@ def generate_report(message, report_type):
     auto_report_details.auto_flagged = 1
     return auto_report_details
 
+# Message (discord message object, message.content contains the text)
+def get_classification_result(perspective_api_client, message, sensitivity = 0.7):
+    report, score = perspective_analyze_message(perspective_api_client, message, sensitivity = sensitivity)
+    if report is None:
+        return None, score
+    else:
+        return report.report_reason, score

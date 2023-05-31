@@ -22,6 +22,7 @@ ATTRIBUTE_MAPPING = {
 # returns a report and associated confidence score, or None if the message is not toxic
 def get_gpt4_response(message, openai_org_token, openai_token, sensitivity=0.7):
     return None, None
+    
     openai.organization = openai_org_token
     openai.api_key = openai_token
     next_prompt = {"role": "user", "content": message.content}
@@ -69,3 +70,11 @@ def generate_report(message, report_type):
     auto_report_details.channel = message.channel
     auto_report_details.auto_flagged = 1
     return auto_report_details
+
+# Message (discord message object, message.content contains the text)
+def get_classification_result(message, openai_org_token, openai_token, sensitivity=0.7):
+    report, score = get_gpt4_response(message, openai_org_token, openai_token, sensitivity=sensitivity)
+    if report is None:
+        return None, score
+    else:
+        return report.report_reason, score
