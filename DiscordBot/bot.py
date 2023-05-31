@@ -170,7 +170,15 @@ class ModBot(discord.Client):
         if message.channel.name == f'group-{self.group_num}-mod':
             author_id = message.author.id
             responses = []
-    
+
+            if message.content.startswith("!flag_sensitivity"):
+                try:
+                    global perspective_api_sensitivity
+                    perspective_api_sensitivity = float(message.content[message.content.find(" ") + 1:].strip())
+                    await message.channel.send(f"Set auto flag sensitivty to {perspective_api_sensitivity}")
+                except:
+                    await message.channel.send(f"Failed to set sensitivity, please type command in form `!flag_sensitivity [SENSITIVITY]`")
+
             # Only respond to messages if they're part of a moderating flow
             if author_id not in self.moderators and not message.content.startswith(Mod_Report.MOD_START_KEYWORD):
                 return

@@ -47,6 +47,7 @@ def get_message_report_type(msg_attributes, sensitivity):
 # returns a report and associated confidence score, or None if the message is not toxic
 def perspective_analyze_message(perspective_api_client, message, sensitivity = 0.7):
     print("ANALYZING MESSAGE")
+    print("sense", sensitivity)
     analyze_request = {
         'comment': { 'text': message.content},
         'requestedAttributes': {'TOXICITY': {}, 'SEVERE_TOXICITY': {}, 'IDENTITY_ATTACK': {}, 'INSULT': {}, 'THREAT': {}, 'SEXUALLY_EXPLICIT': {}}

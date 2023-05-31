@@ -21,6 +21,7 @@ ATTRIBUTE_MAPPING = {
 
 # returns a report and associated confidence score, or None if the message is not toxic
 def get_gpt4_response(message, openai_org_token, openai_token, sensitivity=0.7):
+    return None, None
     openai.organization = openai_org_token
     openai.api_key = openai_token
     next_prompt = {"role": "user", "content": message.content}
