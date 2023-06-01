@@ -203,6 +203,9 @@ class ModBot(discord.Client):
                     if isinstance(r, list):
                         # Note: a fixed k is currently a weird earlier artifact from Eddie (sorry) to ensure multiple-selection dropdowns. It's not actually what we want in our yes-no options. 
                         # We may want to make it so that each response here has a parameter itself for how many options should be selected (i.e. a bool: single-choice or any)
+                        for option in r:
+                            if len(option.label) >= 95: # discord has a limit of 100 character per label; truncate if label too long
+                                option.label = option.label[:95] + "..."
                         select = Select(r, self.moderators[author_id], k=25)
                         select_view = ui.View(timeout=None)
                         select_view.add_item(select)
