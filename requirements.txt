@@ -1,0 +1,5 @@
+openai
+pandas
+requests
+discord.py
+google-api-python-client
