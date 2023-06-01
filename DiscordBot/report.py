@@ -5,6 +5,8 @@ from discord import ui
 from discord.ext import commands
 import pandas as pd
 import copy
+from sentence_transformers import util
+from similarity_model import SENTENCE_MODEL
 
 SPAM_CHOICE = "Spam"
 HARASSMENT_CHOICE = "Harassment"
@@ -117,10 +119,19 @@ class Data:
         # NOTE: Eddie can fix here. Should use separate bool for "deleted" and "dismissed", since right now this includes rejected/dismissed reports
         df = self.moderate_messages.loc[(self.moderate_messages['Author'] == author) & (self.moderate_messages['Deleted'] == 1)]
         return df
+    
+    def is_similar(self, message1, message2, threshold=0.7):
+        message1_emb = SENTENCE_MODEL.encode(message1)
+        message2_emb = SENTENCE_MODEL.encode(message2)
+        similarity = util.cos_sim(message1_emb, message2_emb).item()
+        if similarity > threshold:
+            return True
+        return False
 
     # return similar, not-yet-deleted messages
     def get_similar_messages(self, content):
-        df = self.moderate_messages.loc[(self.moderate_messages.Content == str(content)) & (self.moderate_messages.Deleted == 0)]
+        df = self.moderate_messages[self.moderate_messages.apply(lambda row: self.is_similar(str(content), row["Content"]), axis=1)]
+        df = df.loc[df['Deleted'] == 0]
         return df.head()
 
     # remove a selected message from the channel, and mark as deleted in our dataset  
@@ -301,13 +312,15 @@ class Mod_Report:
                 # loop through the content to build a dropdown of any remaining similar but unselected messages
                 # EDDIE NOTE: Currently stops at an error-throwing number of similar messages (>25). May want to switch if we do an auto filter here rather than selection menu.
                 total_options = 0
+                values_to_check = set()
                 for content in list(content_to_check):
                     similar_df = self.data.get_similar_messages(content)
-                    print(similar_df)
+                    print("similar_df: ", similar_df)
                     for index, report in similar_df.iterrows():
                         total_options += 1
                         content = report['Content']
-                        if total_options < 25: 
+                        if total_options < 25 and report['ID'] not in values_to_check: 
+                            values_to_check.add(report['ID'])
                             report_options.append(discord.SelectOption(label=f"Content: {content}",
                                                                         description=f"Author: {report['Author']}, Report Reason: {report['Report_Reason']}, Report SubCategory: {report['Report_SubCategory']}",
                                                                        value=report['ID']))

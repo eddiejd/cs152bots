@@ -18,7 +18,9 @@ from perspective_api_toxicity import perspective_analyze_message
 from openai_api_toxicity import get_gpt4_response
 import copy
 from googleapiclient import discovery
-from sentence_transformers import SentenceTransformer, util
+from sentence_transformers import util
+from similarity_model import SENTENCE_MODEL
+from collections import defaultdict
 
 import pdb
 
@@ -50,9 +52,6 @@ perspective_api_client = discovery.build(
 )
 
 perspective_api_sensitivity = perspective_api_toxicity.SENSITIVITY_MODES["Moderate"]
-
-# set up sentence transformer for similarity detection
-sentence_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2') # 90M
 
 # Our universal data storage
 data = Data()
@@ -142,6 +141,9 @@ class ModBot(discord.Client):
                 # if this response is a list not a string (NOTE! ASSUMED TO BE A DROPDOWN OPTION LIST): 
                 if isinstance(r, list):
                     # Then create our selection menu, send it to the user, and wait 
+                    for option in r:
+                        if len(option.label) >= 95: # discord has a limit of 100 character per label; truncate if label too long
+                            option.label = option.label[:95] + "..."
                     select = Select(r, self.reports[author_id], k=1)
                     select_view = ui.View(timeout=None)
                     select_view.add_item(select)
@@ -237,8 +239,8 @@ class ModBot(discord.Client):
     
     def check_message_similarity(self, message, messages_to_compare, threshold=0.7):
         # check if message is similar to messages_to_compare
-        message_embedding = sentence_model.encode(message.content)
-        messages_to_compare_embeddings = sentence_model.encode(messages_to_compare)
+        message_embedding = SENTENCE_MODEL.encode(message.content)
+        messages_to_compare_embeddings = SENTENCE_MODEL.encode(messages_to_compare)
         cos_similarities = util.cos_sim(message_embedding, messages_to_compare_embeddings)
         max_similarity = cos_similarities.max().item()
         max_similarity_index = cos_similarities.argmax().item()
