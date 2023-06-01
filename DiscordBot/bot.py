@@ -194,6 +194,14 @@ class ModBot(discord.Client):
                 except:
                     await message.channel.send(f"Failed to set similarity threshold, please type command in form `!similarity_threshold [THRESHOLD]`")
 
+            if message.content.startswith("!set_prohibited_message"):
+                try:
+                    prohibited_message = message.content[message.content.find(" ") + 1:].strip()
+                    self.prohibited_messages.append(prohibited_message)
+                    await message.channel.send(f"Added prohibited message: {prohibited_message}")
+                except:
+                    await message.channel.send(f"Failed to add prohibited message, please type command in form `!set_prohibited_message [MESSAGE]`")
+
             # Only respond to messages if they're part of a moderating flow
             if author_id not in self.moderators and not message.content.startswith(Mod_Report.MOD_START_KEYWORD):
                 return
