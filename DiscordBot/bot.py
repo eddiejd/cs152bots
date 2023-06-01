@@ -18,6 +18,7 @@ from perspective_api_toxicity import perspective_analyze_message
 from openai_api_toxicity import get_gpt4_response
 import copy
 from googleapiclient import discovery
+from sentence_transformers import SentenceTransformer, util
 
 import pdb
 
@@ -50,6 +51,9 @@ perspective_api_client = discovery.build(
 
 perspective_api_sensitivity = perspective_api_toxicity.SENSITIVITY_MODES["Moderate"]
 
+# set up sentence transformer for similarity detection
+sentence_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2') # 90M
+
 # Our universal data storage
 data = Data()
 
@@ -65,7 +69,11 @@ class ModBot(discord.Client):
         self.reports = {} # Map from user IDs to the state of their report
         self.moderators = {} # Map from moderator IDs to the state of their moderation
         self.flagged_messages = {}
-        self.prohibited_messages = []
+        self.prohibited_messages = ["DM me for a link to free bitcoin", "prohibit test"] # dummy predifined prohibited messages
+        self.initialize_prohibited_message_embeddings()
+    
+    def initialize_prohibited_message_embeddings(self):
+        self.prohibited_message_embeddings = sentence_model.encode(self.prohibited_messages) # N * emb_dim
     
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
@@ -228,6 +236,14 @@ class ModBot(discord.Client):
                     await message.delete()
         return 
         
+    def check_prohibit_message_similarity(self, message, threshold=0.7):
+        # check if message is similar to prohibited messages
+        message_embedding = sentence_model.encode(message.content)
+        cos_similarities = util.cos_sim(message_embedding, self.prohibited_message_embeddings)
+        max_similarity = cos_similarities.max().item()
+        if max_similarity > threshold:
+            return True
+        return False
 
     def eval_text(self, message):
         ''''
@@ -237,6 +253,10 @@ class ModBot(discord.Client):
         print(list(self.flagged_messages.keys()))
         # delete if prohibited: this will be useful with an auto-filter
         if message.content in self.prohibited_messages:
+            return "deleted [prohibited message]"
+        
+        # delete if similar to prohibited messages
+        if self.check_prohibit_message_similarity(message):
             return "deleted [prohibited message]"
         
         # flag if the content matches previously user-flagged content 
