@@ -52,6 +52,7 @@ perspective_api_client = discovery.build(
 )
 
 perspective_api_sensitivity = perspective_api_toxicity.SENSITIVITY_MODES["Moderate"]
+similarity_threshold = 0.7
 
 # Our universal data storage
 data = Data()
@@ -185,6 +186,14 @@ class ModBot(discord.Client):
                 except:
                     await message.channel.send(f"Failed to set sensitivity, please type command in form `!flag_sensitivity [SENSITIVITY]`")
 
+            if message.content.startswith("!similarity_threshold"):
+                try:
+                    global similarity_threshold
+                    similarity_threshold = float(message.content[message.content.find(" ") + 1:].strip())
+                    await message.channel.send(f"Set similarity threshold to {similarity_threshold}")
+                except:
+                    await message.channel.send(f"Failed to set similarity threshold, please type command in form `!similarity_threshold [THRESHOLD]`")
+
             # Only respond to messages if they're part of a moderating flow
             if author_id not in self.moderators and not message.content.startswith(Mod_Report.MOD_START_KEYWORD):
                 return
@@ -260,7 +269,7 @@ class ModBot(discord.Client):
         if message.content in self.prohibited_messages:
             return "deleted [prohibited message]"
         # delete if similar to prohibited messages
-        elif self.check_message_similarity(message, self.prohibited_messages)[0]:
+        elif self.check_message_similarity(message, self.prohibited_messages, similarity_threshold)[0]:
             return "deleted [prohibited message]"
         elif len(list(self.flagged_messages.keys())) > 0:
              # flag if the content matches previously user-flagged content 
@@ -273,7 +282,7 @@ class ModBot(discord.Client):
                 return "auto-flagged"
             else:
                 # flag if the content is similar to previously user-flagged content
-                is_similar, similar_message = self.check_message_similarity(message, list(self.flagged_messages.keys()))
+                is_similar, similar_message = self.check_message_similarity(message, list(self.flagged_messages.keys()), similarity_threshold)
                 if is_similar:
                     new_report = copy.copy(self.flagged_messages[similar_message])
                     new_report.author = message.author.name
