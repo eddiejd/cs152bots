@@ -121,7 +121,7 @@ class Data:
     # return similar, not-yet-deleted messages
     def get_similar_messages(self, content):
         df = self.moderate_messages.loc[(self.moderate_messages.Content == str(content)) & (self.moderate_messages.Deleted == 0)]
-        return df.head
+        return df.head()
 
     # remove a selected message from the channel, and mark as deleted in our dataset  
     async def remove_selected_message(self, ID):
