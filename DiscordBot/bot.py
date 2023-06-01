@@ -70,11 +70,7 @@ class ModBot(discord.Client):
         self.moderators = {} # Map from moderator IDs to the state of their moderation
         self.flagged_messages = {}
         self.prohibited_messages = ["DM me for a link to free bitcoin", "prohibit test"] # dummy predifined prohibited messages
-        self.initialize_prohibited_message_embeddings()
-    
-    def initialize_prohibited_message_embeddings(self):
-        self.prohibited_message_embeddings = sentence_model.encode(self.prohibited_messages) # N * emb_dim
-    
+
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
         for guild in self.guilds:
@@ -235,15 +231,19 @@ class ModBot(discord.Client):
                 if "deleted" in flagged_or_prohibited:
                     await message.delete()
         return 
-        
-    def check_prohibit_message_similarity(self, message, threshold=0.7):
-        # check if message is similar to prohibited messages
+    
+    def check_message_similarity(self, message, messages_to_compare, threshold=0.7):
+        # check if message is similar to messages_to_compare
         message_embedding = sentence_model.encode(message.content)
-        cos_similarities = util.cos_sim(message_embedding, self.prohibited_message_embeddings)
+        messages_to_compare_embeddings = sentence_model.encode(messages_to_compare)
+        cos_similarities = util.cos_sim(message_embedding, messages_to_compare_embeddings)
         max_similarity = cos_similarities.max().item()
+        max_similarity_index = cos_similarities.argmax().item()
+        message_with_max_similarity = messages_to_compare[max_similarity_index]
         if max_similarity > threshold:
-            return True
-        return False
+            return True, message_with_max_similarity
+        return False, None
+
 
     def eval_text(self, message):
         ''''
@@ -254,19 +254,28 @@ class ModBot(discord.Client):
         # delete if prohibited: this will be useful with an auto-filter
         if message.content in self.prohibited_messages:
             return "deleted [prohibited message]"
-        
         # delete if similar to prohibited messages
-        if self.check_prohibit_message_similarity(message):
+        elif self.check_message_similarity(message, self.prohibited_messages)[0]:
             return "deleted [prohibited message]"
-        
-        # flag if the content matches previously user-flagged content 
-        elif message.content in list(self.flagged_messages.keys()):
-            new_report = copy.copy(self.flagged_messages[message.content])
-            new_report.author = message.author.name
-            new_report.message_id = message.id
-            new_report.message_content = message.content
-            data.add_report(new_report)
-            return "auto-flagged"
+        elif len(list(self.flagged_messages.keys())) > 0:
+             # flag if the content matches previously user-flagged content 
+            if message.content in list(self.flagged_messages.keys()):
+                new_report = copy.copy(self.flagged_messages[message.content])
+                new_report.author = message.author.name
+                new_report.message_id = message.id
+                new_report.message_content = message.content
+                data.add_report(new_report)
+                return "auto-flagged"
+            else:
+                # flag if the content is similar to previously user-flagged content
+                is_similar, similar_message = self.check_message_similarity(message, list(self.flagged_messages.keys()))
+                if is_similar:
+                    new_report = copy.copy(self.flagged_messages[similar_message])
+                    new_report.author = message.author.name
+                    new_report.message_id = message.id
+                    new_report.message_content = message.content
+                    data.add_report(new_report)
+                    return "auto-flagged"
         else:
             # GPT4 is super slow, so I think perspective api is better for livestreaming applicaiton
             #new_report, gpt_score = get_gpt4_response(message, openai_org_token, openai_token, sensitivity=perspective_api_sensitivity)
