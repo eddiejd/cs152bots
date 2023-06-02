@@ -185,7 +185,7 @@ class ModBot(discord.Client):
                     await message.channel.send(f"Set auto flag sensitivty to {perspective_api_sensitivity}")
                 except:
                     await message.channel.send(f"Failed to set sensitivity, please type command in form `!flag_sensitivity [SENSITIVITY]`")
-
+                return
             if message.content.startswith("!similarity_threshold"):
                 try:
                     global similarity_threshold
@@ -193,7 +193,7 @@ class ModBot(discord.Client):
                     await message.channel.send(f"Set similarity threshold to {similarity_threshold}")
                 except:
                     await message.channel.send(f"Failed to set similarity threshold, please type command in form `!similarity_threshold [THRESHOLD]`")
-
+                return
             if message.content.startswith("!set_prohibited_message"):
                 try:
                     prohibited_message = message.content[message.content.find(" ") + 1:].strip()
@@ -201,7 +201,7 @@ class ModBot(discord.Client):
                     await message.channel.send(f"Added prohibited message: {prohibited_message}")
                 except:
                     await message.channel.send(f"Failed to add prohibited message, please type command in form `!set_prohibited_message [MESSAGE]`")
-
+                return
             # Only respond to messages if they're part of a moderating flow
             if author_id not in self.moderators and not message.content.startswith(Mod_Report.MOD_START_KEYWORD):
                 return
@@ -245,7 +245,8 @@ class ModBot(discord.Client):
         
         # For messages in group-#, examine for flagged or prohibited messages 
         elif message.channel.name == f'group-{self.group_num}':
-             # For messages in group-#, examine for flagged or prohibited messages 
+             # For messages in group-#, examine for flagged or prohibited messages
+            self.actual_channel = message.channel
             mod_channel = self.mod_channels[message.guild.id]
             flagged_or_prohibited = self.eval_text(message)
             if flagged_or_prohibited: 
@@ -266,7 +267,14 @@ class ModBot(discord.Client):
             return True, message_with_max_similarity
         return False, None
 
-
+    def purging_criteria(self, message):
+        for prohibited_message in self.prohibited_messages:
+            if prohibited_message.lower() in message.content.lower():
+                return "deleted [prohibited message or word]"
+        if self.check_message_similarity(message, self.prohibited_messages, similarity_threshold)[0]:
+            return "deleted [high similarity to prohibited message]"
+        return False
+        
     def eval_text(self, message):
         ''''
         TODO: Once you know how you want to evaluate messages in your channel, 
@@ -274,11 +282,9 @@ class ModBot(discord.Client):
         '''
         print(list(self.flagged_messages.keys()))
         # delete if prohibited: this will be useful with an auto-filter
-        if message.content in self.prohibited_messages:
-            return "deleted [prohibited message]"
-        # delete if similar to prohibited messages
-        elif self.check_message_similarity(message, self.prohibited_messages, similarity_threshold)[0]:
-            return "deleted [prohibited message]"
+        purge = self.purging_criteria(message)
+        if purge != False:
+            return purge
         elif len(list(self.flagged_messages.keys())) > 0:
              # flag if the content matches previously user-flagged content 
             if message.content in list(self.flagged_messages.keys()):
