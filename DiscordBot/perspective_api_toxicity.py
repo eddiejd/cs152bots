@@ -3,6 +3,7 @@ import json
 import os
 import report
 from report import Report_Details
+from utils import clean_message
 
 PERSPECTIVE_AUTODELETE_THRESHOLD = 0.9
 
@@ -45,16 +46,25 @@ def get_message_report_type(msg_attributes, sensitivity):
     return None, None
 
 # returns a report and associated confidence score, or None if the message is not toxic
-def perspective_analyze_message(perspective_api_client, message, sensitivity = 0.7):
+def perspective_analyze_message(perspective_api_client, message, sensitivity = 0.7, normalize_message = True):
     print("ANALYZING MESSAGE")
     print("sense", sensitivity)
+    
+    message_string = message.content
+
+    print("MESSAGE BEFORE CLEANING: ", message_string)
+    if normalize_message:
+        message_string = clean_message(message_string)
+    print("MESSAGE AFTER CLEANING: ", message_string)
+
     analyze_request = {
-        'comment': { 'text': message.content},
+        'comment': { 'text': message_string},
         'requestedAttributes': {'TOXICITY': {}, 'SEVERE_TOXICITY': {}, 'IDENTITY_ATTACK': {}, 'INSULT': {}, 'THREAT': {}, 'SEXUALLY_EXPLICIT': {}}
         }
     response = perspective_api_client.comments().analyze(body=analyze_request).execute()
     parsed_response = parse_perspective_response(response)
     report_type, score = get_message_report_type(parsed_response, sensitivity)
+
     print(parsed_response)
     print("MSG CATEGORY:", report_type, "with score", score)
     print()
@@ -77,8 +87,8 @@ def generate_report(message, report_type):
     return auto_report_details
 
 # Message (discord message object, message.content contains the text)
-def get_classification_result(perspective_api_client, message, sensitivity = 0.7):
-    report, score = perspective_analyze_message(perspective_api_client, message, sensitivity = sensitivity)
+def get_classification_result(perspective_api_client, message, sensitivity = 0.7, normalize_message = True):
+    report, score = perspective_analyze_message(perspective_api_client, message, sensitivity = sensitivity, normalize_message = normalize_message)
     if report is None:
         return None, score
     else:

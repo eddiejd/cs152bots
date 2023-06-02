@@ -8,6 +8,7 @@ import os
 import openai
 import report
 from report import Report_Details
+from utils import clean_message
 # print(openai.Model.list()) # Can used to verify GPT-4 access
 
 
@@ -20,12 +21,13 @@ ATTRIBUTE_MAPPING = {
 }
 
 # returns a report and associated confidence score, or None if the message is not toxic
-def get_gpt4_response(message, openai_org_token, openai_token, sensitivity=0.7):
-    return None, None
-    
+def get_gpt4_response(message, openai_org_token, openai_token, sensitivity=0.7, normalize_message = True):
     openai.organization = openai_org_token
     openai.api_key = openai_token
-    next_prompt = {"role": "user", "content": message.content}
+    message_string = message.content
+    if normalize_message:
+        message_string = clean_message(message_string)
+    next_prompt = {"role": "user", "content": message_string}
 
     response = openai.ChatCompletion.create(
     model="gpt-4",
@@ -72,8 +74,8 @@ def generate_report(message, report_type):
     return auto_report_details
 
 # Message (discord message object, message.content contains the text)
-def get_classification_result(message, openai_org_token, openai_token, sensitivity=0.7):
-    report, score = get_gpt4_response(message, openai_org_token, openai_token, sensitivity=sensitivity)
+def get_classification_result(message, openai_org_token, openai_token, sensitivity=0.7, normalize_message = True):
+    report, score = get_gpt4_response(message, openai_org_token, openai_token, sensitivity=sensitivity, normalize_message = normalize_message)
     if report is None:
         return None, score
     else:
