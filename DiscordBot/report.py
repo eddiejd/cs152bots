@@ -58,6 +58,7 @@ class State(Enum):
 
     # Moderator States
     MOD_START = auto()
+    SEE_REPORTS = auto()
     REPORT_SELECTION = auto()
     ASK_VIOLATION = auto()
     MALICIOUS_REPORT = auto()
@@ -181,9 +182,18 @@ class Mod_Report:
 
         # To start, display top 25 reports
         if self.state == State.MOD_START:
-            reply =  ["Thank you for starting the moderation process. Please select from ongoing user reports and flagged messages, ranked in order of report-type (threat, harassment, offensive content, spam, other)"]
+            reply =  ["Thank you for starting the moderation process."]
+            reply.append("To set a new sensitivity threshold for deleting toxic messages, please type: !flag_sensitivity `[new value from 0-1]`.")
+            reply.append("To ban a new word or message, please type: `!set_prohibited_message [word or message to ban]`. Messages with that word/message will be deleted.")
+            reply.append("To set a new sensitivity threshold for detecting and deleting messages similar to those that are prohibited, type: `!similarity_threshold [new value 0-1]`.")
+            reply.append("Otherwise, please type anything else to see the queue of ongoing reports.")
+            self.state = State.SEE_REPORTS
+            return reply
+                         
+        if self.state == State.SEE_REPORTS:
             top_25_df = self.data.top_25_messages()
             report_options = []
+            reply = ["Here are the top-25 reported or auto-flagged messages, prioritized by categories: threats, harassment, offensive content, spam, and other."]
             for index, report in top_25_df.iterrows():
                 content = report['Content']
                 print(f"Author: {report['Author']}, Report Reason: {report['Report_Reason']}, Report SubCategory: {report['Report_SubCategory']}")
@@ -192,8 +202,9 @@ class Mod_Report:
                                                            value=report['ID']))
             # if none, then complete
             if len(report_options) == 0: 
-                self.state == State.MOD_COMPLETE
-                return ["No reported messages left to moderate!"]
+                self.state = State.MOD_COMPLETE
+                reply.append("No reported messages left to moderate!")
+                return reply
 
             self.state = State.REPORT_SELECTION
             reply.append(report_options)
@@ -326,7 +337,7 @@ class Mod_Report:
                                                                        value=report['ID']))
                 # Finish if no organized_attack messages or similar non-deleted messages for them
                 if len(report_options) == 0: 
-                    self.state == State.MOD_COMPLETE
+                    self.state = State.MOD_COMPLETE
                     return ["No reported messages left to moderate!"]
 
                 self.state = State.REPORT_SELECTION
@@ -360,7 +371,7 @@ class Mod_Report:
             reply = [f"SYSTEM: User {self.current_author} has been issued a punishment of {choice} \n"]
             # NOTE FROM EDDIE: currently requires moderator to enter a message to loop back to Previous_Punishment for any remaining authors / terminate the flow (simplest to implement)
             # Can just get more creative with the loop /discord api to prevent the need for this 
-            reply.append("Type anything to move to the next author")
+            reply.append("Type anything to move to the next author of your selected reports.")
             self.state = State.PREVIOUS_PUNISHMENT
             return reply 
 
