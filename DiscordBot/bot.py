@@ -304,19 +304,19 @@ class ModBot(discord.Client):
                     new_report.message_content = message.content
                     data.add_report(new_report)
                     return "auto-flagged"
-        else:
-            # GPT4 is super slow, so I think perspective api is better for livestreaming applicaiton
-            #new_report, gpt_score = get_gpt4_response(message, openai_org_token, openai_token, sensitivity=perspective_api_sensitivity)
-            new_report, score = perspective_analyze_message(perspective_api_client, message, sensitivity=perspective_api_sensitivity)
-            #print("Perspective score: ", score, "GPT score: ", gpt_score)
-            if new_report is not None:
-                if score > perspective_api_toxicity.PERSPECTIVE_AUTODELETE_THRESHOLD:
-                    return "deleted [exceeds toxicity threshold]"
-                else:
-                    data.add_report(new_report)
-                    return "auto-flagged"
+        #else:
+        # GPT4 is super slow, so I think perspective api is better for livestreaming applicaiton
+        #new_report, gpt_score = get_gpt4_response(message, openai_org_token, openai_token, sensitivity=perspective_api_sensitivity)
+        new_report, score = perspective_analyze_message(perspective_api_client, message, sensitivity=perspective_api_sensitivity)
+        #print("Perspective score: ", score, "GPT score: ", gpt_score)
+        if new_report is not None:
+            if score > perspective_api_toxicity.PERSPECTIVE_AUTODELETE_THRESHOLD:
+                return "deleted [exceeds toxicity threshold]"
             else:
-                return False
+                data.add_report(new_report)
+                return "auto-flagged"
+        else:
+            return False
     
     
     def code_format(self, text, flagged_or_prohibited):

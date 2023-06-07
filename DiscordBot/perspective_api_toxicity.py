@@ -41,7 +41,7 @@ def parse_perspective_response(response):
 
 def get_message_report_type(msg_attributes, sensitivity):
     for attribute in REPORT_HIERARCHY:
-        if msg_attributes[attribute] > sensitivity:
+        if attribute in msg_attributes and msg_attributes[attribute] > sensitivity:
             return attribute, msg_attributes[attribute]
     return None, None
 
@@ -56,12 +56,18 @@ def perspective_analyze_message(perspective_api_client, message, sensitivity = 0
     if normalize_message:
         message_string = clean_message(message_string)
     print("MESSAGE AFTER CLEANING: ", message_string)
-
-    analyze_request = {
-        'comment': { 'text': message_string},
-        'requestedAttributes': {'TOXICITY': {}, 'SEVERE_TOXICITY': {}, 'IDENTITY_ATTACK': {}, 'INSULT': {}, 'THREAT': {}, 'SEXUALLY_EXPLICIT': {}}
-        }
-    response = perspective_api_client.comments().analyze(body=analyze_request).execute()
+    try:
+        analyze_request = {
+            'comment': { 'text': message_string},
+            'requestedAttributes': {'TOXICITY': {}, 'SEVERE_TOXICITY': {}, 'IDENTITY_ATTACK': {}, 'INSULT': {}, 'THREAT': {}, 'SEXUALLY_EXPLICIT': {}}
+            }
+        response = perspective_api_client.comments().analyze(body=analyze_request).execute()
+    except:
+        analyze_request = {
+            'comment': { 'text': message_string},
+            'requestedAttributes': {'TOXICITY': {}, 'SEVERE_TOXICITY': {}, 'IDENTITY_ATTACK': {}, 'INSULT': {}, 'THREAT': {}}
+            }
+        response = perspective_api_client.comments().analyze(body=analyze_request).execute()
     parsed_response = parse_perspective_response(response)
     report_type, score = get_message_report_type(parsed_response, sensitivity)
 
